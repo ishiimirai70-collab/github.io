@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#7048e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="おんがく">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <title>おんがくメーカー</title>
+  <meta name="description" content="音符を置いて音楽を作れるアプリ。テンプレート曲や楽譜の読み込みにも対応。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Music&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">🎵 <span>おんがくメーカー</span></div>
+    <input id="song-title" class="song-title" type="text" aria-label="曲のタイトル" maxlength="60">
+    <nav class="header-actions">
+      <button id="btn-templates" class="btn accent">📚 テンプレート</button>
+      <button id="btn-import" class="btn accent2">📷 楽譜を読み込む</button>
+      <button id="btn-file" class="btn">💾 保存・開く</button>
+      <button id="btn-install" class="btn install" hidden>📲 アプリにする</button>
+    </nav>
+  </header>
+
+  <div class="toolbar">
+    <div class="group transport">
+      <button id="btn-play" class="btn play" title="再生 / 一時停止 (スペース)">▶</button>
+      <button id="btn-stop" class="btn" title="停止して最初へ">⏹</button>
+      <button id="btn-loop" class="btn toggle" title="くりかえし再生">🔁</button>
+    </div>
+    <label class="group field">テンポ ♩=
+      <input id="bpm" type="number" min="20" max="400" step="1">
+    </label>
+    <label class="group field">拍子
+      <select id="timesig">
+        <option value="4/4">4/4</option>
+        <option value="3/4">3/4</option>
+        <option value="2/4">2/4</option>
+        <option value="6/8">6/8</option>
+        <option value="3/8">3/8</option>
+        <option value="2/2">2/2</option>
+        <option value="5/4">5/4</option>
+      </select>
+    </label>
+    <label class="group field">調
+      <select id="keysig"></select>
+    </label>
+    <label class="group field">小節
+      <input id="bars" type="number" min="1" max="999" step="1">
+    </label>
+  </div>
+
+  <div class="toolbar">
+    <div class="group seg" id="tools">
+      <button class="btn" data-tool="pen" title="ペン: 置く・動かす・のばす / タップで消す">✏️ ペン</button>
+      <button class="btn" data-tool="erase" title="消しゴム">🧽 消す</button>
+      <button class="btn" data-tool="pan" title="画面を動かす（2本指でも動かせます）">✋ 移動</button>
+    </div>
+    <div class="group seg" id="lengths" title="置く音符の長さ">
+      <button class="btn note-btn" data-len="48" title="全音符"><span class="mf">𝅝</span></button>
+      <button class="btn note-btn" data-len="24" title="2分音符"><span class="mf">𝅗𝅥</span></button>
+      <button class="btn note-btn" data-len="12" title="4分音符"><span class="mf">𝅘𝅥</span></button>
+      <button class="btn note-btn" data-len="6" title="8分音符"><span class="mf">𝅘𝅥𝅮</span></button>
+      <button class="btn note-btn" data-len="3" title="16分音符"><span class="mf">𝅘𝅥𝅯</span></button>
+      <button class="btn toggle" id="btn-dot" title="付点（1.5倍の長さ）">付点</button>
+      <button class="btn toggle" id="btn-triplet" title="3連符">3連</button>
+    </div>
+    <label class="group field">ます目
+      <select id="snap">
+        <option value="12">4分</option>
+        <option value="6">8分</option>
+        <option value="3">16分</option>
+        <option value="4">3連8分</option>
+        <option value="2">3連16分</option>
+      </select>
+    </label>
+    <div class="group">
+      <button id="btn-zoom-out" class="btn" title="ちぢめる">🔍−</button>
+      <button id="btn-zoom-in" class="btn" title="ひろげる">🔍＋</button>
+    </div>
+    <div class="group">
+      <button id="btn-undo" class="btn" title="元に戻す (Ctrl+Z)">↶</button>
+      <button id="btn-redo" class="btn" title="やり直す (Ctrl+Y)">↷</button>
+      <button id="btn-clear" class="btn" title="このトラックの音符を全部消す">🗑</button>
+    </div>
+    <div class="group seg" id="views">
+      <button class="btn" data-view="roll">🎹 ピアノロール</button>
+      <button class="btn" data-view="score">🎼 楽譜</button>
+    </div>
+  </div>
+
+  <div class="tracks" id="tracks"></div>
+
+  <main class="main">
+    <div id="roll" class="roll-wrap"><div class="roll-spacer"><canvas></canvas></div></div>
+    <div id="score-view" class="score-view hidden">
+      <div class="score-actions">
+        <button id="btn-print" class="btn">🖨 印刷</button>
+        <button id="btn-svg" class="btn">⬇ 楽譜を画像(SVG)で保存</button>
+        <span class="hint">楽譜は自動で作られます（表示のみ）。音符の編集はピアノロールで。</span>
+      </div>
+      <div class="score-scroll"><div id="score" class="score"></div><div id="score-playhead" class="score-playhead hidden"></div></div>
+    </div>
+  </main>
+
+  <div class="statusbar" id="status">✏️ ます目をタップすると音符が置けます。ドラッグで長さ、音符をドラッグで移動、タップで削除。左の鍵盤で音を確かめられます。</div>
+
+  <!-- テンプレート -->
+  <dialog id="dlg-templates" class="dlg">
+    <div class="dlg-head">
+      <h2>📚 テンプレート曲</h2>
+      <button class="btn close" data-close>✕</button>
+    </div>
+    <div class="tabs" id="tpl-tabs"></div>
+    <div class="tpl-grid" id="tpl-grid"></div>
+    <p class="note">🎵 クラシックや童謡は、著作権が切れた（パブリックドメインの）曲を収録しています。<br>
+      アニメやゲームの曲は著作権があるため、このアプリ用に作った<b>オリジナルの「アニメ風」曲</b>を入れています。
+      好きなアニメ曲を使いたいときは、MIDI・MusicXML ファイルや楽譜の画像を「📷 楽譜を読み込む」から取り込めます（個人で楽しむ範囲で使ってね）。</p>
+  </dialog>
+
+  <!-- 読み込み -->
+  <dialog id="dlg-import" class="dlg wide">
+    <div class="dlg-head">
+      <h2>📷 楽譜を読み込む</h2>
+      <button class="btn close" data-close>✕</button>
+    </div>
+    <div id="import-start">
+      <div class="drop" id="drop">
+        <div class="drop-icon">🎼</div>
+        <div>ここにファイルをドラッグ＆ドロップ</div>
+        <div class="drop-buttons">
+          <label class="btn accent">📁 ファイルを選ぶ<input type="file" id="file-input" hidden accept=".mid,.midi,.musicxml,.xml,.mxl,.abc,.txt,.json,.pdf,image/*"></label>
+          <label class="btn accent2" id="camera-label">📸 カメラで撮る<input type="file" id="camera-input" hidden accept="image/*" capture="environment"></label>
+        </div>
+      </div>
+      <div class="formats">
+        <div><b>🖼 画像・PDF（楽譜の写真やスキャン）</b><br>五線と音符を自動で読み取って音符を並べます。印刷されたきれいな楽譜がおすすめ。（休符・臨時記号は読み取れません）</div>
+        <div><b>🎹 MIDI（.mid）</b><br>ほぼ正確に読み込めます。</div>
+        <div><b>🎼 MusicXML（.musicxml / .mxl / .xml）</b><br>MuseScore などの楽譜ソフトから書き出せる形式。いちばん正確です。</div>
+        <div><b>📝 ABC記譜法（.abc / テキスト）</b><br>下の欄に貼り付けても読み込めます。</div>
+        <div><b>💾 このアプリの保存ファイル（.json）</b></div>
+      </div>
+      <details class="abc-box">
+        <summary>📝 ABC記譜法のテキストを貼り付ける</summary>
+        <textarea id="abc-text" rows="7" spellcheck="false" placeholder="X:1&#10;T:きらきら星&#10;M:4/4&#10;L:1/4&#10;K:C&#10;C C G G | A A G2 | F F E E | D D C2 |"></textarea>
+        <button id="btn-abc" class="btn accent">ABCを読み込む</button>
+      </details>
+      <div class="import-mode">
+        読み込み方:
+        <label><input type="radio" name="import-mode" value="new" checked> 新しい曲にする</label>
+        <label><input type="radio" name="import-mode" value="add"> 今の曲にトラックを追加</label>
+      </div>
+    </div>
+
+    <div id="omr-panel" class="hidden">
+      <div class="omr-status" id="omr-status"></div>
+      <div class="omr-options">
+        <label>譜表
+          <select id="omr-mode">
+            <option value="treble">ト音記号（1段ずつ）</option>
+            <option value="bass">ヘ音記号（1段ずつ）</option>
+            <option value="grand">大譜表（ピアノ：ト音＋ヘ音）</option>
+          </select>
+        </label>
+        <label>調号 <select id="omr-key"></select></label>
+        <label>拍子 <select id="omr-ts">
+          <option value="4/4">4/4</option><option value="3/4">3/4</option><option value="2/4">2/4</option><option value="6/8">6/8</option><option value="3/8">3/8</option><option value="2/2">2/2</option>
+        </select></label>
+        <label>テンポ <input id="omr-bpm" type="number" min="20" max="300" value="100"></label>
+      </div>
+      <p class="hint">色つきの丸が見つかった音符です（<span style="color:#9c36b5">●全</span> <span style="color:#2f9e44">●2分</span> <span style="color:#1c7ed6">●4分</span> <span style="color:#f76707">●8分</span> <span style="color:#e03131">●16分</span>）。
+        まちがって見つけた丸は<b>タップすると除外</b>できます（もう一度タップで元に戻る）。</p>
+      <div class="omr-pages" id="omr-pages"></div>
+      <div class="dlg-foot">
+        <button id="btn-omr-back" class="btn">← 戻る</button>
+        <button id="btn-omr-preview" class="btn">▶ 試聴</button>
+        <button id="btn-omr-apply" class="btn accent">✔ この内容で読み込む</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- 保存・開く -->
+  <dialog id="dlg-file" class="dlg">
+    <div class="dlg-head">
+      <h2>💾 保存・開く</h2>
+      <button class="btn close" data-close>✕</button>
+    </div>
+    <section>
+      <h3>このブラウザに保存</h3>
+      <div class="row">
+        <input id="save-name" type="text" placeholder="曲の名前" maxlength="60">
+        <button id="btn-save" class="btn accent">保存</button>
+      </div>
+      <ul class="lib" id="lib"></ul>
+    </section>
+    <section id="export-section">
+      <h3>ファイルに書き出す</h3>
+      <div class="row wrap">
+        <button id="btn-export-json" class="btn">📄 保存ファイル (.json)</button>
+        <button id="btn-export-midi" class="btn">🎹 MIDI (.mid)</button>
+      </div>
+      <p class="hint">MIDI は他の音楽アプリ（GarageBand、MuseScore など）でも開けます。</p>
+    </section>
+    <section>
+      <h3>新しく作る</h3>
+      <button id="btn-new" class="btn">✨ 新しい曲（まっさら）</button>
+    </section>
+  </dialog>
+
+  <!-- アプリとして追加 -->
+  <dialog id="dlg-install" class="dlg">
+    <div class="dlg-head">
+      <h2>📲 ホーム画面に追加してアプリにする</h2>
+      <button class="btn close" data-close>✕</button>
+    </div>
+    <p>無料で、アプリストアのアプリのように使えます。追加すると、ホーム画面のアイコンから全画面で開けて、ネットがなくても使えます。</p>
+    <section class="install-steps" id="install-ios">
+      <h3>iPhone / iPad（Safari）</h3>
+      <ol>
+        <li>この画面を <b>Safari</b> で開く</li>
+        <li>下（iPadは上）の <b>共有ボタン</b>（□に↑のマーク）をタップ</li>
+        <li><b>「ホーム画面に追加」</b>を選ぶ（見つからないときはメニューを下にスクロール）</li>
+        <li>右上の<b>「追加」</b>をタップ</li>
+      </ol>
+    </section>
+    <section class="install-steps" id="install-android">
+      <h3>Android（Chrome）</h3>
+      <ol>
+        <li>右上の <b>︙</b> メニューをタップ</li>
+        <li><b>「アプリをインストール」</b>または<b>「ホーム画面に追加」</b>を選ぶ</li>
+      </ol>
+    </section>
+    <section class="install-steps">
+      <h3>パソコン（Chrome / Edge）</h3>
+      <ol>
+        <li>アドレスバーの右にある <b>インストール</b> アイコン（□に↓）をクリック</li>
+      </ol>
+    </section>
+    <div class="dlg-foot">
+      <button id="btn-install-now" class="btn accent" hidden>今すぐインストール</button>
+    </div>
+  </dialog>
+
+  <!-- 確認・入力 -->
+  <dialog id="dlg-ask" class="dlg ask">
+    <p id="ask-msg" class="ask-msg"></p>
+    <input id="ask-input" type="text" maxlength="30" hidden>
+    <div class="ask-actions">
+      <button id="ask-cancel" class="btn">キャンセル</button>
+      <button id="ask-ok" class="btn accent">OK</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/util.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/pianoroll.js"></script>
+  <script src="js/score.js"></script>
+  <script src="js/midi.js"></script>
+  <script src="js/musicxml.js"></script>
+  <script src="js/abc.js"></script>
+  <script src="js/omr.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
