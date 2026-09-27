@@ -52,6 +52,33 @@
     saveTimer = setTimeout(() => store.set(LS_CURRENT, { song: state.song, active: state.active }), 400);
   };
 
+  // ---- 確認・入力ダイアログ（ブラウザの confirm/prompt の代わり） ----------------
+  function ask(message, opts = {}) {
+    return new Promise((resolve) => {
+      const d = $('#dlg-ask');
+      $('#ask-msg').textContent = message;
+      const input = $('#ask-input');
+      input.hidden = opts.input == null;
+      input.value = opts.input || '';
+      $('#ask-ok').textContent = opts.ok || 'OK';
+      $('#ask-ok').className = 'btn ' + (opts.danger ? 'danger' : 'accent');
+      const done = (v) => {
+        $('#ask-ok').onclick = $('#ask-cancel').onclick = null;
+        d.onclose = null;
+        if (d.open) d.close();
+        resolve(v);
+      };
+      $('#ask-ok').onclick = () => done(opts.input == null ? true : input.value);
+      $('#ask-cancel').onclick = () => done(opts.input == null ? false : null);
+      d.onclose = () => done(opts.input == null ? false : null);
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') done(input.value);
+      };
+      d.showModal();
+      if (!input.hidden) input.focus();
+    });
+  }
+
   // ---- トースト ------------------------------------------------------------
   let toastTimer = null;
   function toast(msg, ms = 2600) {
@@ -227,9 +254,9 @@
       del.className = 'btn mini';
       del.textContent = '✕';
       del.title = 'トラックを削除';
-      del.onclick = () => {
+      del.onclick = async () => {
         if (state.song.tracks.length <= 1) return toast('トラックは1つ以上必要です');
-        if (tr.notes.length && !confirm(`「${tr.name}」を削除しますか？`)) return;
+        if (tr.notes.length && !(await ask(`「${tr.name}」を削除しますか？（↶で元に戻せます）`, { ok: '削除', danger: true }))) return;
         checkpoint();
         state.song.tracks.splice(i, 1);
         state.active = Math.max(0, Math.min(state.active, state.song.tracks.length - 1));
@@ -253,9 +280,9 @@
     box.appendChild(add);
   }
 
-  function renameTrack(i) {
+  async function renameTrack(i) {
     const tr = state.song.tracks[i];
-    const v = prompt('トラックの名前', tr.name);
+    const v = await ask('トラックの名前', { input: tr.name, ok: '変更' });
     if (v && v.trim()) {
       checkpoint();
       tr.name = v.trim().slice(0, 30);
@@ -434,10 +461,10 @@
     $('#btn-zoom-out').onclick = () => roll.setZoom(1 / 1.35);
     $('#btn-undo').onclick = undo;
     $('#btn-redo').onclick = redo;
-    $('#btn-clear').onclick = () => {
+    $('#btn-clear').onclick = async () => {
       const tr = state.song.tracks[state.active];
       if (!tr.notes.length) return;
-      if (!confirm(`「${tr.name}」の音符を全部消しますか？（↶で元に戻せます）`)) return;
+      if (!(await ask(`「${tr.name}」の音符を全部消しますか？（↶で元に戻せます）`, { ok: '全部消す', danger: true }))) return;
       checkpoint();
       tr.notes = [];
       changed();
@@ -642,7 +669,7 @@
       }
     } catch (err) {
       console.error(err);
-      alert('読み込みに失敗しました: ' + err.message);
+      toast('読み込めませんでした: ' + err.message, 6000);
     }
   }
 
@@ -739,7 +766,7 @@
       try {
         applyImported(MM.importABC($('#abc-text').value), 'ABC楽譜');
       } catch (err) {
-        alert('読み込みに失敗しました: ' + err.message);
+        toast('読み込めませんでした: ' + err.message, 6000);
       }
     };
     const ok = $('#omr-key');
@@ -803,8 +830,8 @@
       del.className = 'btn';
       del.textContent = '🗑';
       del.title = '削除';
-      del.onclick = () => {
-        if (!confirm(`「${n}」を削除しますか？`)) return;
+      del.onclick = async () => {
+        if (!(await ask(`「${n}」を削除しますか？`, { ok: '削除', danger: true }))) return;
         const l2 = store.get(LS_LIBRARY, {});
         delete l2[n];
         store.set(LS_LIBRARY, l2);
@@ -816,12 +843,12 @@
   }
 
   function bindFile() {
-    $('#btn-save').onclick = () => {
+    $('#btn-save').onclick = async () => {
       const name = ($('#save-name').value || state.song.title || '無題').trim().slice(0, 60);
       const lib = store.get(LS_LIBRARY, {});
-      if (lib[name] && !confirm(`「${name}」は既にあります。上書きしますか？`)) return;
+      if (lib[name] && !(await ask(`「${name}」は既にあります。上書きしますか？`, { ok: '上書き' }))) return;
       lib[name] = { song: state.song, saved: Date.now() };
-      if (!store.set(LS_LIBRARY, lib)) return alert('保存できませんでした（ブラウザの保存容量が足りないかもしれません）');
+      if (!store.set(LS_LIBRARY, lib)) return toast('保存できませんでした。ブラウザの保存容量が足りないか、保存が許可されていません', 5000);
       renderLibrary();
       toast(`「${name}」を保存しました`);
     };
@@ -843,6 +870,13 @@
 
   // ---- 起動 ----------------------------------------------------------------------
   function init() {
+    if (window.MM_ARTIFACT) {
+      // 共有ページではダウンロード・印刷・カメラが使えないので隠す
+      ['#btn-print', '#btn-svg', '#btn-export-json', '#btn-export-midi', '#camera-label', '#export-section'].forEach((q) => {
+        const el = $(q);
+        if (el) el.hidden = true;
+      });
+    }
     bindToolbar();
     bindImport();
     bindFile();

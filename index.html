@@ -129,7 +129,7 @@
         <div>ここにファイルをドラッグ＆ドロップ</div>
         <div class="drop-buttons">
           <label class="btn accent">📁 ファイルを選ぶ<input type="file" id="file-input" hidden accept=".mid,.midi,.musicxml,.xml,.mxl,.abc,.txt,.json,.pdf,image/*"></label>
-          <label class="btn accent2">📸 カメラで撮る<input type="file" id="camera-input" hidden accept="image/*" capture="environment"></label>
+          <label class="btn accent2" id="camera-label">📸 カメラで撮る<input type="file" id="camera-input" hidden accept="image/*" capture="environment"></label>
         </div>
       </div>
       <div class="formats">
@@ -192,7 +192,7 @@
       </div>
       <ul class="lib" id="lib"></ul>
     </section>
-    <section>
+    <section id="export-section">
       <h3>ファイルに書き出す</h3>
       <div class="row wrap">
         <button id="btn-export-json" class="btn">📄 保存ファイル (.json)</button>
@@ -204,6 +204,16 @@
       <h3>新しく作る</h3>
       <button id="btn-new" class="btn">✨ 新しい曲（まっさら）</button>
     </section>
+  </dialog>
+
+  <!-- 確認・入力 -->
+  <dialog id="dlg-ask" class="dlg ask">
+    <p id="ask-msg" class="ask-msg"></p>
+    <input id="ask-input" type="text" maxlength="30" hidden>
+    <div class="ask-actions">
+      <button id="ask-cancel" class="btn">キャンセル</button>
+      <button id="ask-ok" class="btn accent">OK</button>
+    </div>
   </dialog>
 
   <div id="toast" class="toast"></div>

@@ -21,7 +21,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #17151f;
     --panel: #221f2e;
     --border: #3a3550;
@@ -40,6 +40,24 @@
   }
 }
 
+:root[data-theme="dark"] {
+  --bg: #17151f;
+  --panel: #221f2e;
+  --border: #3a3550;
+  --text: #ece9f7;
+  --text-sub: #a39dbb;
+  --btn: #2e2a3e;
+  --btn-hover: #3a3550;
+  --roll-white: #24212f;
+  --roll-black: #1c1a26;
+  --roll-grid: #2c2939;
+  --roll-beat: #3a3650;
+  --roll-bar: #625b82;
+  --roll-ruler: #2a2638;
+  --roll-out: rgba(0, 0, 0, 0.25);
+  color-scheme: dark;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -54,13 +72,18 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
 }
 
 .mf, .music-font { font-family: "Noto Music", "Bravura", "Segoe UI Symbol", "Apple Symbols", serif; }
 
-.hidden { display: none !important; }
+.hidden, [hidden] { display: none !important; }
+.btn.danger { background: #e03131; color: #fff; border-color: #e03131; }
+.dlg.ask { max-width: min(420px, calc(100vw - 32px)); padding: 20px; }
+.ask-msg { margin: 0 0 14px; font-size: 15px; line-height: 1.6; }
+#ask-input { width: 100%; margin-bottom: 14px; }
+.ask-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ---- ヘッダー ---- */
 .app-header {
@@ -222,8 +245,9 @@ body {
 .score svg { display: block; }
 .score-playhead { position: absolute; width: 2px; background: rgba(224, 49, 49, 0.7); pointer-events: none; }
 @media (prefers-color-scheme: dark) {
-  :root { --paper: #fdfcf7; }
+  :root:not([data-theme="light"]) { --paper: #fdfcf7; }
 }
+:root[data-theme="dark"] { --paper: #fdfcf7; }
 
 .statusbar {
   padding: 5px 10px;
