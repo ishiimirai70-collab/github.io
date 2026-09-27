@@ -684,13 +684,14 @@
     omrPages.title = title;
     const total = omrPages.reduce((a, p) => a + p.notes.length, 0);
     const staves = omrPages.reduce((a, p) => a + p.staves.length, 0);
-    $('#omr-mode').value = MM.OMR.guessGrand(omrPages) ? 'grand' : 'treble';
+    $('#omr-mode').value = 'auto';
     const ts = MM.OMR.guessTimeSig(omrPages).join('/');
     if ([...$('#omr-ts').options].some((o) => o.value === ts)) $('#omr-ts').value = ts;
-    $('#omr-key').value = '0';
+    $('#omr-key').value = String(MM.OMR.guessKey(omrPages));
     $('#omr-bpm').value = String(state.song.bpm || 100);
     $('#import-start').classList.add('hidden');
     $('#omr-panel').classList.remove('hidden');
+    omrSong(); // 音名を計算してからプレビューを描く
     $('#omr-status').textContent = staves
       ? `✅ 五線 ${staves} 段・音符 ${total} 個を見つけました。調号などを確認して「読み込む」を押してね。`
       : '⚠️ 五線が見つかりませんでした。明るく、まっすぐ撮った楽譜の画像を使ってみてください。';
@@ -713,6 +714,7 @@
         const n = MM.OMR.hitNote(page, x, y, s);
         if (n) {
           n.excluded = !n.excluded;
+          omrSong();
           MM.OMR.drawOverlay(page, c, { maxWidth: maxW });
         }
       };
@@ -769,6 +771,14 @@
         toast('読み込めませんでした: ' + err.message, 6000);
       }
     };
+    // 設定を変えたら、読み取った音名を描き直す
+    ['#omr-mode', '#omr-key', '#omr-ts'].forEach((q) =>
+      $(q).addEventListener('change', () => {
+        if (!omrPages) return;
+        omrSong();
+        drawOmrPages();
+      })
+    );
     const ok = $('#omr-key');
     for (let k = -7; k <= 7; k++) ok.add(new Option(KEY_NAMES[k], String(k)));
     $('#btn-omr-back').onclick = () => {

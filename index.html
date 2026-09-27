@@ -166,6 +166,7 @@
       <div class="omr-options">
         <label>譜表
           <select id="omr-mode">
+            <option value="auto">自動（ト音記号・ヘ音記号を見分ける）</option>
             <option value="treble">ト音記号（1段ずつ）</option>
             <option value="bass">ヘ音記号（1段ずつ）</option>
             <option value="grand">大譜表（ピアノ：ト音＋ヘ音）</option>
@@ -177,7 +178,7 @@
         </select></label>
         <label>テンポ <input id="omr-bpm" type="number" min="20" max="300" value="100"></label>
       </div>
-      <p class="hint">色つきの丸が見つかった音符です（<span style="color:#9c36b5">●全</span> <span style="color:#2f9e44">●2分</span> <span style="color:#1c7ed6">●4分</span> <span style="color:#f76707">●8分</span> <span style="color:#e03131">●16分</span>）。
+      <p class="hint">色つきの丸が見つかった音符で、横の文字が読み取った音（ドレミ）です。五線の左上に、ト音記号かヘ音記号かの判定が出ます。まちがっていたら「譜表」を変えてください。丸の色は長さ（<span style="color:#9c36b5">●全</span> <span style="color:#2f9e44">●2分</span> <span style="color:#1c7ed6">●4分</span> <span style="color:#f76707">●8分</span> <span style="color:#e03131">●16分</span>）。
         まちがって見つけた丸は<b>タップすると除外</b>できます（もう一度タップで元に戻る）。</p>
       <div class="omr-pages" id="omr-pages"></div>
       <div class="dlg-foot">

@@ -474,7 +474,114 @@
       clusters++;
       break;
     }
+    // 音部記号: ト音記号は五線の上下に大きくはみ出す。ヘ音記号は五線の中に収まる
+    // （小節番号・左端の縦線・カッコを拾わないよう、幅のある大きなかたまりだけを調べる）
+    const clef = detectClef(Math.max(0, Math.round(st.x0 - d)), Math.min(W - 1, Math.round(st.x0 + d * 6)));
+    if (clef) {
+      st.clef = clef.type;
+      headerEnd = Math.max(headerEnd, clef.maxX + d * 0.3);
+      st.key = detectKey(clef.maxX + 1);
+    }
     st.headerEnd = headerEnd;
+
+    // 範囲の中のインクのかたまり（連結成分）を調べる
+    function components(x0, x1, y0, y1, seedTop, seedBot) {
+      x0 = Math.max(0, x0);
+      x1 = Math.min(W - 1, x1);
+      y0 = Math.max(0, y0);
+      y1 = Math.min(H - 1, y1);
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      if (bw <= 0 || bh <= 0) return [];
+      const seen = new Uint8Array(bw * bh);
+      const out = [];
+      for (let j = Math.max(0, seedTop - y0); j <= Math.min(bh - 1, seedBot - y0); j++) {
+        for (let i = 0; i < bw; i++) {
+          if (seen[j * bw + i] || !at(x0 + i, y0 + j)) continue;
+          const stack = [j * bw + i];
+          seen[j * bw + i] = 1;
+          const c = { n: 0, minY: j, maxY: j, minX: i, maxX: i, pts: [] };
+          while (stack.length) {
+            const q = stack.pop();
+            const u = q % bw, v = (q - u) / bw;
+            c.n++;
+            c.pts.push(q);
+            if (v < c.minY) c.minY = v;
+            if (v > c.maxY) c.maxY = v;
+            if (u < c.minX) c.minX = u;
+            if (u > c.maxX) c.maxX = u;
+            for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+              const uu = u + du, vv = v + dv;
+              if (uu < 0 || vv < 0 || uu >= bw || vv >= bh) continue;
+              const k = vv * bw + uu;
+              if (seen[k] || !at(x0 + uu, y0 + vv)) continue;
+              seen[k] = 1;
+              stack.push(k);
+            }
+          }
+          c.minX += x0;
+          c.maxX += x0;
+          c.minY += y0;
+          c.maxY += y0;
+          c.bw = bw;
+          c.ox = x0;
+          c.oy = y0;
+          out.push(c);
+        }
+      }
+      return out;
+    }
+
+    function detectClef(x0, x1) {
+      const y0 = Math.round(st.top - d * 3.5), y1 = Math.round(st.bottom + d * 3.5);
+      let best = null;
+      for (const c of components(x0, x1, y0, y1, Math.round(st.top), Math.round(st.bottom))) {
+        // 縦線やカッコ（細い）、数字（小さい）は除く
+        const wd = (c.maxX - c.minX + 1) / d;
+        if (wd < 1.3 || wd > 4.5) continue;
+        if (!best || c.n > best.n) best = c;
+      }
+      if (!best) return null;
+      const down = (best.maxY - st.bottom) / d;
+      const height = (best.maxY - best.minY) / d;
+      // ト音記号: 高さ5間以上で五線の下にはみ出す。ヘ音記号: 高さ3〜4間で五線の下のほうには届かない
+      return { type: height >= 4.3 && down > -0.3 ? 'treble' : 'bass', maxX: best.maxX };
+    }
+
+    /** 音部記号のすぐ右の ♯ / ♭ を数える（調号） */
+    function detectKey(xStart) {
+      const y0 = Math.round(st.top - d * 2), y1 = Math.round(st.bottom + d * 2);
+      const comps = components(Math.round(xStart), Math.round(xStart + d * 9), y0, y1, Math.round(st.top - d), Math.round(st.bottom + d))
+        .filter((c) => c.n > d * d * 0.15)
+        .sort((p, q) => p.minX - q.minX);
+      let sharps = 0, flats = 0, lastX = xStart;
+      for (const c of comps) {
+        const wd = (c.maxX - c.minX + 1) / d, ht = (c.maxY - c.minY + 1) / d;
+        if (c.minX - lastX > d * 1.6) break; // すき間があいたら終わり
+        if (wd < 0.7 && ht < 1.0) {
+          lastX = c.maxX; // ヘ音記号の点
+          continue;
+        }
+        if (wd < 0.45 || wd > 1.15 || ht < 1.7 || ht > 3.6) break; // 拍子記号の数字や音符
+        // 縦の線の本数: ♯ は2本、♭ は1本（左側）
+        const cols = new Map();
+        for (const q of c.pts) {
+          const u = q % c.bw;
+          cols.set(u, (cols.get(u) || 0) + 1);
+        }
+        const tall = [...cols.entries()].filter(([, n]) => n >= ht * d * 0.6).map(([u]) => u).sort((p, q) => p - q);
+        let groups = 0, prev = -9;
+        for (const u of tall) {
+          if (u - prev > 1) groups++;
+          prev = u;
+        }
+        if (groups >= 2) sharps++;
+        else if (groups === 1) flats++;
+        else break;
+        lastX = c.maxX;
+      }
+      if (sharps && flats) return 0;
+      return sharps ? Math.min(7, sharps) : -Math.min(7, flats);
+    }
 
     const cands = [];
     const levels = [];
@@ -658,6 +765,7 @@
       while (w < d && at(x + w, midY - Math.round(d * 0.5))) w++;
       if (w > d * 0.6) continue;
       if (heads.some((h) => Math.abs(h.x - x) < d * 1.1)) continue;
+      if (bot > st.bottom + d * 3) st.barDown = (st.barDown || 0) + 1;
       xs.push(x);
     }
     // 近いものをまとめる
@@ -745,11 +853,23 @@
     return (oct + 1) * 12 + MM.DIATONIC_SEMI[step] + alters[step];
   }
 
+  /** 調号（♯/♭の数）を推測。一番多かったものを使う */
+  OMR.guessKey = function (pages) {
+    const counts = new Map();
+    for (const p of pages) for (const st of p.staves) if (st.key != null) counts.set(st.key, (counts.get(st.key) || 0) + 1);
+    let best = 0, bestN = 0;
+    for (const [k, n] of counts) if (n > bestN || (n === bestN && k !== 0)) {
+      best = k;
+      bestN = n;
+    }
+    return best;
+  };
+
   /** 音価の並びから拍子を推測 */
   OMR.guessTimeSig = function (pages) {
     const counts = new Map();
     for (const page of pages) {
-      for (const m of measuresOf(page, OMR.guessGrand(pages) ? 'grand' : 'treble')) {
+      for (const m of measuresOf(page, 'auto')) {
         const sum = m.clusters.reduce((a, c) => a + c.dur, 0);
         if (sum > 0) counts.set(sum, (counts.get(sum) || 0) + 1);
       }
@@ -763,14 +883,36 @@
     return best || [4, 4];
   };
 
+  /**
+   * 五線を「段」にまとめ、それぞれの五線がト音記号かヘ音記号かを決める
+   * mode: 'auto'（音部記号を見分ける）| 'grand'（2段ずつピアノ）| 'treble' | 'bass'
+   */
+  function systemsOf(page, mode) {
+    const st = page.staves;
+    const out = [];
+    if (mode === 'grand') {
+      for (let i = 0; i < st.length; i += 2) out.push({ staves: st.slice(i, i + 2), roles: ['treble', 'bass'] });
+    } else if (mode === 'treble' || mode === 'bass') {
+      st.forEach((s) => out.push({ staves: [s], roles: [mode] }));
+    } else {
+      for (let i = 0; i < st.length; i++) {
+        const a = st[i], b = st[i + 1];
+        const pair = b && ((a.clef === 'treble' && b.clef === 'bass') || (a.barDown || 0) >= 2);
+        if (pair) {
+          out.push({ staves: [a, b], roles: [a.clef === 'bass' ? 'bass' : 'treble', b.clef === 'treble' ? 'treble' : 'bass'] });
+          i++;
+        } else out.push({ staves: [a], roles: [a.clef || 'treble'] });
+      }
+    }
+    for (const sys of out) sys.staves.forEach((s, i) => (s.role = sys.roles[i]));
+    return out;
+  }
+
   /** 段ごと・小節ごとに音をまとめる */
   function measuresOf(page, mode) {
-    const grand = mode === 'grand';
-    const systems = [];
-    if (grand) for (let i = 0; i < page.staves.length; i += 2) systems.push(page.staves.slice(i, i + 2));
-    else page.staves.forEach((st) => systems.push([st]));
     const out = [];
-    for (const sys of systems) {
+    for (const system of systemsOf(page, mode)) {
+      const sys = system.staves;
       const d = sys[0].d;
       const ns = page.notes.filter((n) => !n.excluded && sys.includes(n.staff)).sort((p, q) => p.x - q.x);
       // 小節線（大譜表では両方の段で見つかったものを優先）
@@ -792,7 +934,7 @@
           else clusters.push({ x: n.x, notes: [n] });
         }
         for (const c of clusters) c.dur = Math.min(...c.notes.map((n) => Math.round(n.dur)));
-        out.push({ sys, x0: bounds[i], x1: bounds[i + 1], clusters, d });
+        out.push({ sys, roles: system.roles, x0: bounds[i], x1: bounds[i + 1], clusters, d });
       }
     }
     return out;
@@ -812,14 +954,9 @@
 
     const song = { title: opts.title || '読み込んだ楽譜', bpm: opts.bpm || 100, timeSig: opts.timeSig || [4, 4], keySig: ks, bars: 1, tracks: [] };
     const barT = MM.barTicks(song);
-    const grand = opts.mode === 'grand';
-    const rh = MM.newTrack(song, grand ? '右手' : 'メロディ', 'piano');
-    song.tracks.push(rh);
-    let lh = null;
-    if (grand) {
-      lh = MM.newTrack(song, '左手', 'piano');
-      song.tracks.push(lh);
-    }
+    const rh = MM.newTrack(song, '右手（ト音記号）', 'piano');
+    const lh = MM.newTrack(song, '左手（ヘ音記号）', 'piano');
+    song.tracks.push(rh, lh);
     let t = 0;
     let first = true;
     for (const page of pages) {
@@ -863,9 +1000,10 @@
         let tt = t + extra[0];
         cl.forEach((c, i) => {
           for (const n of c.notes) {
-            const role = grand ? (m.sys.indexOf(n.staff) === 0 ? 'treble' : 'bass') : opts.mode;
+            const role = m.roles[m.sys.indexOf(n.staff)];
             const p = pitchOf(n.k, role, alters);
-            const target = grand && role === 'bass' ? lh : rh;
+            n.pitch = p;
+            const target = role === 'bass' ? lh : rh;
             if (!target.notes.some((q) => q.p === p && q.t === tt)) target.notes.push({ p, t: tt, d: Math.round(n.dur) });
           }
           tt += c.dur + extra[i + 1];
@@ -875,7 +1013,11 @@
         first = false;
       }
     }
-    if (lh && !lh.notes.length) song.tracks.pop();
+    // 片方しかないときは1トラックに
+    song.tracks = song.tracks.filter((t) => t.notes.length);
+    if (song.tracks.length === 1) song.tracks[0].name = 'メロディ';
+    if (!song.tracks.length) song.tracks.push(rh);
+    song.tracks.forEach((t, i) => (t.color = MM.TRACK_COLORS[i]));
     return MM.fitBars(song);
   };
 
@@ -898,6 +1040,19 @@
       g.fillStyle = 'rgba(120,120,120,0.18)';
       g.fillRect(st.x0, st.top - st.d * 2, (st.headerEnd || st.x0) - st.x0, st.bottom - st.top + st.d * 4);
     }
+    // 五線の左に音部記号の判定を表示
+    for (const st of page.staves) {
+      if (!st.role) continue;
+      const fs = Math.max(12, st.d * 1.3);
+      g.font = `bold ${fs}px system-ui, sans-serif`;
+      const label = st.role === 'bass' ? 'ヘ音' : 'ト音';
+      const tw = g.measureText(label).width;
+      g.fillStyle = st.role === 'bass' ? 'rgba(47,158,68,0.9)' : 'rgba(112,72,232,0.9)';
+      g.fillRect(st.x0, st.top - st.d * 2.4 - fs, tw + 10, fs + 6);
+      g.fillStyle = '#fff';
+      g.textBaseline = 'top';
+      g.fillText(label, st.x0 + 5, st.top - st.d * 2.4 - fs + 3);
+    }
     const colors = { 48: '#9c36b5', 72: '#9c36b5', 24: '#2f9e44', 36: '#2f9e44', 12: '#1c7ed6', 18: '#1c7ed6', 6: '#f76707', 9: '#f76707', 3: '#e03131', 4.5: '#e03131' };
     for (const n of page.notes) {
       const r = n.staff.d * 0.85;
@@ -906,6 +1061,18 @@
       g.beginPath();
       g.ellipse(n.x, n.y, r, r * 0.8, 0, 0, Math.PI * 2);
       g.stroke();
+      if (n.pitch != null && !n.excluded) {
+        const fs = Math.max(11, n.staff.d * 0.95);
+        g.font = `bold ${fs}px system-ui, sans-serif`;
+        g.textBaseline = 'middle';
+        g.lineWidth = 3;
+        g.strokeStyle = '#fff';
+        const tx = n.x + r + 2, ty = n.y;
+        const name = MM.noteNameJa(n.pitch);
+        g.strokeText(name, tx, ty);
+        g.fillStyle = '#212529';
+        g.fillText(name, tx, ty);
+      }
       if (n.excluded) {
         g.beginPath();
         g.moveTo(n.x - r, n.y - r);
