@@ -216,7 +216,7 @@
         if (st === 'T') {
           out.push(`<text x="${hx}" y="${top + S * 3}" font-size="${S * 4.2}" class="music-font" fill="${INK}">&#x1D11E;</text>`);
         } else {
-          out.push(`<text x="${hx}" y="${top + S * 1}" font-size="${S * 4.2}" class="music-font" fill="${INK}">&#x1D122;</text>`);
+          out.push(`<text x="${hx}" y="${top + S * 3.4}" font-size="${S * 4.2}" class="music-font" fill="${INK}">&#x1D122;</text>`);
         }
       }
       hx += S * 3.4 + 6;
@@ -474,9 +474,22 @@
     return `<ellipse cx="${x}" cy="${y}" rx="${RX}" ry="${S * 0.44}" fill="${INK}" transform="rotate(-22 ${x} ${y})"/>`;
   }
 
+  // 臨時記号は図形で描く（フォントによって位置がずれないように）
   function accidental(x, y, sym) {
-    const dy = sym === '♭' ? S * 0.3 : S * 0.55;
-    return `<text x="${x}" y="${y + dy}" font-size="${S * 1.7}" text-anchor="middle" fill="${INK}" font-family="serif">${sym}</text>`;
+    const k = S / 10;
+    if (sym === '♯') {
+      return `<g fill="${INK}"><rect x="${x - 2.6 * k}" y="${y - 13 * k}" width="${1.1 * k}" height="${25 * k}"/><rect x="${x + 1.6 * k}" y="${y - 14 * k}" width="${1.1 * k}" height="${25 * k}"/>` +
+        `<path d="M${x - 5 * k},${y - 3 * k} L${x + 5 * k},${y - 6 * k} L${x + 5 * k},${y - 3.2 * k} L${x - 5 * k},${y - 0.2 * k} Z"/>` +
+        `<path d="M${x - 5 * k},${y + 4.2 * k} L${x + 5 * k},${y + 1.2 * k} L${x + 5 * k},${y + 4 * k} L${x - 5 * k},${y + 7 * k} Z"/></g>`;
+    }
+    if (sym === '♭') {
+      return `<g fill="${INK}"><rect x="${x - 3.5 * k}" y="${y - 17 * k}" width="${1.2 * k}" height="${22 * k}"/>` +
+        `<path d="M${x - 2.3 * k},${y + 5 * k} C${x + 7 * k},${y - 1 * k} ${x + 4 * k},${y - 7 * k} ${x - 2.3 * k},${y - 2.5 * k} L${x - 2.3 * k},${y - 0.5 * k} C${x + 2 * k},${y - 4 * k} ${x + 4 * k},${y - 1 * k} ${x - 2.3 * k},${y + 3 * k} Z"/></g>`;
+    }
+    // ♮
+    return `<g fill="${INK}"><rect x="${x - 3 * k}" y="${y - 13 * k}" width="${1.1 * k}" height="${19 * k}"/><rect x="${x + 1.9 * k}" y="${y - 6 * k}" width="${1.1 * k}" height="${19 * k}"/>` +
+      `<path d="M${x - 3 * k},${y - 2.5 * k} L${x + 3 * k},${y - 4.5 * k} L${x + 3 * k},${y - 1.8 * k} L${x - 3 * k},${y + 0.2 * k} Z"/>` +
+      `<path d="M${x - 3 * k},${y + 4.5 * k} L${x + 3 * k},${y + 2.5 * k} L${x + 3 * k},${y + 5.2 * k} L${x - 3 * k},${y + 7.2 * k} Z"/></g>`;
   }
 
   function drawRest(x, top, type) {

@@ -1,5 +1,5 @@
 /* おんがくメーカー: オフラインでも使えるようにファイルを保存しておく */
-const CACHE = 'ongaku-maker-v2';
+const CACHE = 'ongaku-maker-v3';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/util.js', 'js/audio.js', 'js/templates.js', 'js/pianoroll.js', 'js/score.js',
