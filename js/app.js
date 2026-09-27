@@ -868,6 +868,45 @@
     };
   }
 
+  // ---- アプリとして使う（ホーム画面に追加・オフライン） ------------------------------
+  function bindInstall() {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    if (window.MM_ARTIFACT) return;
+    // 長押しメニュー（コピーなど）を出さない。文字入力の欄だけは使える
+    document.addEventListener('contextmenu', (e) => {
+      if (!e.target.closest('input, textarea, select')) e.preventDefault();
+    });
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+    if (standalone) return;
+    let deferred = null;
+    const btn = $('#btn-install');
+    btn.hidden = false;
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    $('#install-ios').hidden = !ios && /Android/.test(ua);
+    $('#install-android').hidden = ios;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferred = e;
+      $('#btn-install-now').hidden = false;
+    });
+    window.addEventListener('appinstalled', () => {
+      btn.hidden = true;
+      $('#dlg-install').close();
+      toast('アプリを追加しました！ホーム画面から開けます 🎉', 4000);
+    });
+    btn.onclick = () => openDialog('#dlg-install');
+    $('#btn-install-now').onclick = async () => {
+      if (!deferred) return;
+      deferred.prompt();
+      await deferred.userChoice.catch(() => {});
+      deferred = null;
+      $('#btn-install-now').hidden = true;
+    };
+  }
+
   // ---- 起動 ----------------------------------------------------------------------
   function init() {
     if (window.MM_ARTIFACT) {
@@ -878,6 +917,7 @@
       });
     }
     bindToolbar();
+    bindInstall();
     bindImport();
     bindFile();
     $('#btn-templates').onclick = () => {
